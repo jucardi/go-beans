@@ -9,7 +9,7 @@ We could define a base interface
 
 ```Go
 type IAlertHandler interface {
-	Send(alert *Alert) error
+    Send(alert *Alert) error
 }
 ```
 
@@ -17,24 +17,24 @@ And then have multiple implementations of this interface to send an alert via a 
 
 ```Go
 type EmailAlertHandler struct {
-	// some fields here if needed
+    // some fields here if needed
 }
 
 func (e *EmailAlertHandler) Send(alert *Alert) error {
-	// handle some logic to send the SMTP message
-	return nil
+    // handle some logic to send the SMTP message
+    return nil
 }
 ```
 
 
 ```Go
 type SMSAlertHandler intestructrface {
-	// some fields here if needed
+    // some fields here if needed
 }
 
 func (s *SMSAlertHandler) Send(alert *Alert) error {
-	// handle some logic to send the SMS message
-	return nil
+    // handle some logic to send the SMS message
+    return nil
 }
 ```
 
@@ -44,17 +44,17 @@ Using the `go-beans` factory, we could register these beans with a name (Eg. "em
 // Alert trigger handler
 
 func GetHandler() IAlertHandler {
-	// name of the handler to be used. Eg "email"
-	alertType := config.AlertType
-	return beans.Resolve((*IAlertHandler)(nil), alertType).(IAlertHandler)
+    // name of the handler to be used. Eg "email"
+    alertType := config.AlertType
+    return beans.Resolve((*IAlertHandler)(nil), alertType).(IAlertHandler)
 }
 
 
 func sendAlert(alert *Alert) {
-	err := GetHandler().Send(alert)
-	if err != nil {
-		log.Error(err)
-	}
+    err := GetHandler().Send(alert)
+    if err != nil {
+        log.Error(err)
+    }
 }
 ```
 
@@ -76,11 +76,11 @@ type EmailAlertHandler struct {
 
 // The method to be implemented
 func (e *EmailAlertHandler) Send(alert *Alert) error {
-	return nil
+    return nil
 }
 
 func (t *ServiceImpl) init() {
-	// any init logic of the bean.
+    // any init logic of the bean.
 }
 
 // Here we define what the bean name will be. We declare it in a constant, so if multiple implementations
@@ -88,8 +88,8 @@ func (t *ServiceImpl) init() {
 // implementations, the beans name must be unique
 const BeanName = "email"
 
-// The following like is to validate the implementation of the interface on build, so it do not fail
-// in runtime if a new function was added to the interface and missed to add the implementation in
+// The following like is to validate the implementation of the interface on build, so it do not fail in
+// runtime if a new function was added to the interface and missed to add the implementation in
 // this section.
 var _ IAlertHandler = (*EmailAlertHandler)(nil)
 
@@ -99,27 +99,28 @@ var instance *EmailAlertHandler
 // Registering the bean implementation.
 func init() {
 
-	// In this example we do a lazy construct of a singleton bean, where the singleton will be initialized
-	// on first use rather than on load of the application.
-	//
-	// The (*IAlertHandler)(nil) is a nil pointer to the bean interface. It is required so the factory knows
-	// what is the bean type so it can properly register it. An alternative to this approach is to declare
-	// pointer to the interface without assigning any value to it, so it can be passed as an argument.
-	//
-	// Eg.
-	//        var reference *IAlertHandler
-	//
-	//        bean.RegisterFunc(reference, BeanName, func() interface{}) {
-	//
-	beans.RegisterFunc((*IAlertHandler)(nil), BeanName, func() interface{} {
-		if instance != nil {
-			return instance
-		}
+    // In this example we do a lazy construct of a singleton bean, where the singleton will be
+    // initialized on first use rather than on load of the application.
+    //
+    // The (*IAlertHandler)(nil) is a nil pointer to the bean interface. It is required so the
+    // factory knows what is the bean type so it can properly register it. An alternative to this
+    // approach is to declare pointer to the interface without assigning any value to it, so it
+    // can be passed as an argument.
+    //
+    // Eg.
+    //        var reference *IAlertHandler
+    //
+    //        bean.RegisterFunc(reference, BeanName, func() interface{}) {
+    //
+    beans.RegisterFunc((*IAlertHandler)(nil), BeanName, func() interface{} {
+        if instance != nil {
+            return instance
+    }
 
-		instance = &EmailAlertHandler{}
-		instance.init()
-		return instance
-	})
+        instance = &EmailAlertHandler{}
+        instance.init()
+        return instance
+    })
 }
 ```
 
@@ -128,11 +129,11 @@ so other services will not have to talk to the beans factory directly
 ```Go
 package alerts
 
-// With this singleton function, the primary implementation of the bean can be accessed directly from the
-// package where it was defined, so third party consumers won't have to import the bean package, making it
-// transparent to utilize any implemented service.
+// With this singleton function, the primary implementation of the bean can be accessed directly from
+// the package where it was defined, so third party consumers won't have to import the bean package,
+// making it transparent to utilize any implemented service.
 func Get() IAlertHandler {
-	return beans.Resolve((*IAlertHandler)(nil), config.AlertType).(IAlertHandler)
+    return beans.Resolve((*IAlertHandler)(nil), config.AlertType).(IAlertHandler)
 }
 ```
 
@@ -148,37 +149,36 @@ package alerts
 /* =========== Mock implementation ============ */
 
 type MockAlertHandler struct {
-	sendResponse error
+    sendResponse error
 }
 
 func (m *MockAlertHandler) Send(alert *Alert) error {
-	return m.sendResponse
+    return m.sendResponse
 }
 
 // Additional method useful to add a expected response with one of the interface methods are called
 func (m *MockAlertHandler) WhenSend(expectedResponse error) {
-	m.sendResponse = expectedResponse
+    m.sendResponse = expectedResponse
 }
 
 var (
-	// Ensures the struct implements the interface on compile time, to prevent failures in runtime
-	_ IAlertHandler = (*MockAlertHandler)(nil)
+    // Ensures the struct implements the interface on compile time, to prevent failures in runtime
+    _ IAlertHandler = (*MockAlertHandler)(nil)
 
-	// The mock instance
-	mock *MockAlertHandler
+    // The mock instance
+    mock *MockAlertHandler
 )
 
 // To obtain and register a mock implementation.
 func Mock() *MockAlert {
-	if mock != nil {
-		return mock
-	}
+    if mock != nil {
+        return mock
+    }
 
-	mock = &MockAlertHandler{}
-
-	beans.RegisterFunc((*IAlertHandler)(nil), "email", func() interface{} {
-		return mock
-	})
+    mock = &MockAlertHandler{}
+    beans.RegisterFunc((*IAlertHandler)(nil), "email", func() interface{} {
+        return mock
+    })
 
 	return mock
 }
