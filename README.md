@@ -3,7 +3,7 @@
 
 `go-beans` is a components manager / components factory that easily allows dependency injection and easily switch these dependencies with other implementations of the components (beans)
 
-For example, let's assume we wanted to create an Alerts handler to send alerts on events in a system. There are multiple mechanisms to send out an alert (Email, SMS, chat message, push notification, RSS, etc.).
+For example, assume we wanted to create an Alerts handler to send alerts on events in a system. There are multiple mechanisms to send out an alert (Email, SMS, chat message, push notification, RSS, etc.).
 
 We could define a base interface
 
@@ -202,10 +202,15 @@ func TestSomething(t *testing.T) {
 }
 ```
 
-## Getting started.
+##### Quick Start
 
-To start using this package
+To get the most recent source code:
 
-```
+```bash
 go get github.com/jucardi/go-beans
 ```
+
+To get a specific version:
+
+```bash
+go get gopkg.in/jucardi/go-beans.v1
