@@ -202,6 +202,32 @@ func SetPrimary(interfaceRef interface{}, name string) error {
 	return SetPrimaryByType(getType(interfaceRef), name)
 }
 
+// GetPrimaryNameByType returns the name of the primary bean. Returns an empty string if no beans exist as primary.
+func GetPrimaryNameByType(t reflect.Type) string {
+	if v, ok := dependencies[t]; ok {
+		return v.primary
+	}
+	return ""
+}
+
+// GetPrimaryName returns the name of the primary bean. Returns an empty string if no beans exist as primary.
+//
+// The 'interfaceRef' is a reference pointer to the bean interface so the bean factory knows what is the bean type, and
+// it can properly register it. It can be a nil pointer to the interface. There are 2 ways of passing this a nil pointer.
+// Let us assume we have a bean interface called IService. To obtain a nil pointer to the interface:
+//
+// Option 1:   (*IService)(nil)
+//
+//   Eg.   bean.GetPrimaryName((*IService)(nil))
+//
+// Option 2:   var reference *IService
+//
+//   Eg.   bean.GetPrimaryName(reference)
+//
+func GetPrimaryName(interfaceRef interface{}) string {
+	return GetPrimaryNameByType(getType(interfaceRef))
+}
+
 func containsType(c map[reflect.Type]*dependencyCollection, key reflect.Type) bool {
 	if _, ok := c[key]; ok {
 		return ok
