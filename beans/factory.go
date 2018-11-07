@@ -86,7 +86,7 @@ func Get(t reflect.Type, name string) interface{} {
 			}
 		}
 
-		log.Error(fmt.Sprintf("No primary dependency found for type '%s'", t.Name()))
+		log.Errorf("no primary dependency found for type '%s'", t.Name())
 		return nil
 	}
 
