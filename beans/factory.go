@@ -228,6 +228,34 @@ func GetPrimaryName(interfaceRef interface{}) string {
 	return GetPrimaryNameByType(getType(interfaceRef))
 }
 
+// ExistsByType indicates if a dependency by the given name exists
+func ExistsByType(t reflect.Type, name string) bool {
+	if !containsType(dependencies, t) {
+		return false
+	}
+
+	_, ok := dependencies[t].instances[name]
+	return ok
+}
+
+// Exists indicates if a dependency by the given name exists
+//
+// The 'interfaceRef' is a reference pointer to the bean interface so the bean factory knows what is the bean type, and
+// it can properly register it. It can be a nil pointer to the interface. There are 2 ways of passing this a nil pointer.
+// Let us assume we have a bean interface called IService. To obtain a nil pointer to the interface:
+//
+// Option 1:   (*IService)(nil)
+//
+//   Eg.   bean.ExistsByType((*IService)(nil), name)
+//
+// Option 2:   var reference *IService
+//
+//   Eg.   bean.Exists(reference, name)
+//
+func Exists(interfaceRef interface{}, name string) bool {
+	return ExistsByType(getType(interfaceRef), name)
+}
+
 func containsType(c map[reflect.Type]*dependencyCollection, key reflect.Type) bool {
 	if _, ok := c[key]; ok {
 		return ok

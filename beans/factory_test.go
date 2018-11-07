@@ -50,7 +50,7 @@ func (t *TestServiceImpl3) GetName() string {
 }
 
 // Other test interface
-type OtherInterface interface {
+type IOther interface {
 	Name() string
 }
 
@@ -61,6 +61,10 @@ type OtherImpl1 struct {
 func (o *OtherImpl1) Name() string {
 	return o.name
 }
+
+// Not used interface
+
+type INotUsed interface{}
 
 // endregion
 
@@ -173,29 +177,46 @@ func TestResolve_TypeNotFound(t *testing.T) {
 }
 
 func TestImplicitPrimary(t *testing.T) {
-	beans.Register((*OtherInterface)(nil), "something", &OtherImpl1{name: "primary"})
-	val := beans.Primary((*OtherInterface)(nil)).(OtherInterface)
+	beans.Register((*IOther)(nil), "something", &OtherImpl1{name: "primary"})
+	val := beans.Primary((*IOther)(nil)).(IOther)
 	assert.NotNil(t, val)
 	assert.Equal(t, "primary", val.Name())
 }
 
 func TestPrimary_NotFound(t *testing.T) {
-	beans.Register((*OtherInterface)(nil), "name1", &OtherImpl1{name: "name1"})
-	beans.Register((*OtherInterface)(nil), "name2", &OtherImpl1{name: "name2"})
-	val := beans.Primary((*OtherInterface)(nil))
+	beans.Register((*IOther)(nil), "name1", &OtherImpl1{name: "name1"})
+	beans.Register((*IOther)(nil), "name2", &OtherImpl1{name: "name2"})
+	val := beans.Primary((*IOther)(nil))
 	assert.Nil(t, val)
 }
 
 func TestSetAllowOverrides(t *testing.T) {
-	err := beans.Register((*OtherInterface)(nil), "name", &OtherImpl1{name: "name1"})
+	err := beans.Register((*IOther)(nil), "name", &OtherImpl1{name: "name1"})
 	assert.Nil(t, err)
-	err = beans.Register((*OtherInterface)(nil), "name", &OtherImpl1{name: "name2"})
+	err = beans.Register((*IOther)(nil), "name", &OtherImpl1{name: "name2"})
 	assert.NotNil(t, err)
-	comp1 := beans.Resolve((*OtherInterface)(nil), "name").(OtherInterface)
+	comp1 := beans.Resolve((*IOther)(nil), "name").(IOther)
 	assert.Equal(t, "name1", comp1.Name())
 	beans.SetAllowOverrides(true)
-	err = beans.Register((*OtherInterface)(nil), "name", &OtherImpl1{name: "name2"})
+	err = beans.Register((*IOther)(nil), "name", &OtherImpl1{name: "name2"})
 	assert.Nil(t, err)
-	comp2 := beans.Resolve((*OtherInterface)(nil), "name").(OtherInterface)
+	comp2 := beans.Resolve((*IOther)(nil), "name").(IOther)
 	assert.Equal(t, "name2", comp2.Name())
+}
+
+func TestExists(t *testing.T) {
+	name := "something"
+	beans.Register((*IOther)(nil), name, &OtherImpl1{name: "primary"})
+	contains := beans.Exists((*IOther)(nil), name)
+	assert.True(t, contains)
+	assert.False(t, beans.Exists((*IService)(nil), name))
+	assert.False(t, beans.Exists((*INotUsed)(nil), name))
+}
+
+func TestGetPrimaryName(t *testing.T) {
+	name := "something"
+	beans.Register((*IOther)(nil), name, &OtherImpl1{name: "primary"})
+	beans.SetPrimary((*IOther)(nil), name)
+	assert.Equal(t, name, beans.GetPrimaryName((*IOther)(nil)))
+	assert.Equal(t, "", beans.GetPrimaryName((*INotUsed)(nil)))
 }
