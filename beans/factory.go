@@ -171,13 +171,15 @@ func Register(interfaceRef interface{}, name string, component interface{}) erro
 }
 
 // SetPrimaryByType sets the primary bean name to be used.
-func SetPrimaryByType(t reflect.Type, name string) error {
+func SetPrimaryByType(t reflect.Type, name string, replace ...bool) error {
 	if !containsType(dependencies, t) {
 		return fmt.Errorf("no dependencies found for type %s, unable to resolve", t.Name())
 	}
 
 	if _, ok := dependencies[t].instances[name]; ok {
-		dependencies[t].primary = name
+		if dependencies[t].primary == "" || (dependencies[t].primary != "" && len(replace) > 0 && replace[0]) {
+			dependencies[t].primary = name
+		}
 		return nil
 	}
 
@@ -198,8 +200,8 @@ func SetPrimaryByType(t reflect.Type, name string) error {
 //
 //   Eg.   bean.SetPrimary(reference, beanName)
 //
-func SetPrimary(interfaceRef interface{}, name string) error {
-	return SetPrimaryByType(getType(interfaceRef), name)
+func SetPrimary(interfaceRef interface{}, name string, replace ...bool) error {
+	return SetPrimaryByType(getType(interfaceRef), name, replace...)
 }
 
 // GetPrimaryNameByType returns the name of the primary bean. Returns an empty string if no beans exist as primary.

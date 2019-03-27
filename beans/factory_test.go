@@ -108,6 +108,8 @@ func TestRegister(t *testing.T) {
 func TestSetPrimary(t *testing.T) {
 	beans.Register(ComponentType, "some-name", &TestServiceImpl2{})
 	beans.SetPrimary(ComponentType, "some-name")
+	assert.NotEqual(t, "bean2", Primary().GetName())
+	beans.SetPrimary(ComponentType, "some-name", true)
 	assert.Equal(t, "bean2", Primary().GetName())
 }
 
