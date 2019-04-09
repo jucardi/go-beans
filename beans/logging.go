@@ -35,12 +35,10 @@ type ConsoleLogger struct {
 
 // Error logs a message at level Error.
 func (c *ConsoleLogger) Error(args ...interface{}) {
-	argx := append([]interface{}{"[ ERROR ] "}, args)
-	fmt.Fprintln(os.Stderr, argx...)
+	_, _ = fmt.Fprintln(os.Stderr, args...)
 }
 
 // Errorf logs a message at level Error.
 func (c *ConsoleLogger) Errorf(format string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, "[ ERROR ] "+format, args...)
-	fmt.Fprintln(os.Stderr)
+	_, _ = fmt.Fprintf(os.Stderr, format, args...)
 }

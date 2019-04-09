@@ -38,9 +38,6 @@ const BeanName = "some-bean-name"
 // this section.
 var _ IService = (*ServiceImpl)(nil)
 
-// In this example we'll use a singleton instance to be registered as the bean.
-var instance *ServiceImpl
-
 // Registering the bean implementation.
 func init() {
 	// From time to time, the implementation of a component may depend on the initialization of other
@@ -56,20 +53,31 @@ func init() {
 	//
 	//        bean.RegisterFunc(reference, BeanName, func() interface{}) {
 	//
-	beans.RegisterFunc((*IService)(nil), BeanName, func() interface{} {
-		if instance != nil {
-			return instance
-		}
-
-		instance = &ServiceImpl{}
+	if err := beans.RegisterFunc((*IService)(nil), BeanName, func() interface{} {
+		instance := &ServiceImpl{}
 		instance.init()
 		return instance
-	})
+	}, true); err != nil {
+		// Use your logger here.
+		println(err.Error())
+	}
+
+	// To the bean as primary
+	if err := beans.SetPrimary((*IService)(nil), BeanName); err != nil {
+		// Use your logger here.
+		println(err.Error())
+	}
 }
 
 // With this singleton function, the primary implementation of the bean can be accessed directly from the
 // package where it was defined, so third party consumers won't have to import the bean package, making it
 // transparent to utilize any implemented service.
-func Service() IService {
-	return beans.Resolve((*IService)(nil), BeanName).(IService)
+//
+// This example shows how to use a variadic arg for an optional bean name to be provided so it can retrieve
+// the proper bean by the given name. If no name is provided, it will return the primary bean.
+func Service(name ...string) IService {
+	if len(name) == 0 {
+		return beans.Primary((*IService)(nil)).(IService)
+	}
+	return beans.Resolve((*IService)(nil), name[0]).(IService)
 }
