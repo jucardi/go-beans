@@ -18,9 +18,9 @@ type constructorInfo struct {
 }
 
 var (
-	allowOverrides             = false
-	dependencies               = map[reflect.Type]*dependencyCollection{}
-	log            IBeanLogger = &emptyLogger{}
+	allowOverrides = false
+	dependencies   = map[reflect.Type]*dependencyCollection{}
+	onErr          ErrorCallback
 )
 
 // Clear clears all registered dependencies. It requires Allow Overrides to be set to TRUE. Use this with caution, it was meant for testing purposes only.
@@ -32,9 +32,9 @@ func Clear() error {
 	return nil
 }
 
-// SetLogger sets an IBeanLogger implementation to use as a logger for the bean factory.
-func SetLogger(logger IBeanLogger) {
-	log = logger
+// OnError sets a function callback that will be invoked when an error occurs in the beans package
+func OnError(callback ErrorCallback) {
+	onErr = callback
 }
 
 // SetAllowOverrides is normally used when testing. It allows a registered bean to be overwritten by another implementation, like a Mock
@@ -81,7 +81,7 @@ func Primary(ref interface{}) interface{} {
 // Get gets the the instance by the specified name.
 func Get(t reflect.Type, name string) interface{} {
 	if !containsType(dependencies, t) {
-		log.Errorf("no dependencies found for type %s, unable to resolve.", t.Name())
+		onError(fmt.Errorf("no dependencies found for type %s, unable to resolve", t.Name()))
 		return nil
 	}
 
@@ -99,7 +99,7 @@ func Get(t reflect.Type, name string) interface{} {
 		return instance
 	}
 
-	log.Errorf("dependency %s not registered, unable to resolve.", name)
+	onError(fmt.Errorf("dependency %s not registered, unable to resolve", name))
 	return nil
 }
 
@@ -115,7 +115,7 @@ func GetPrimary(t reflect.Type) interface{} {
 		}
 	}
 
-	log.Errorf("no primary dependency found for type '%s'", t.Name())
+	onError(fmt.Errorf("no primary dependency found for type '%s'", t.Name()))
 	return nil
 }
 
@@ -316,4 +316,10 @@ func containsType(c map[reflect.Type]*dependencyCollection, key reflect.Type) bo
 
 func getType(obj interface{}) reflect.Type {
 	return reflect.TypeOf(obj).Elem()
+}
+
+func onError(err error) {
+	if onErr != nil {
+		onErr(err)
+	}
 }

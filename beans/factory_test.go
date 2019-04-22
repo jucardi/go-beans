@@ -72,10 +72,6 @@ type INotUsed interface{}
 
 var ComponentType *IService
 
-func init() {
-	beans.SetLogger(&beans.ConsoleLogger{})
-}
-
 func before(t *testing.T) {
 	beans.SetAllowOverrides(true)
 	assert.NoError(t, beans.Clear())
