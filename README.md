@@ -213,4 +213,4 @@ go get github.com/jucardi/go-beans
 To get a specific version:
 
 ```bash
-go get gopkg.in/jucardi/go-beans.v1
+go get github.com/jucardi/go-beans
