@@ -6,9 +6,11 @@ import (
 	"reflect"
 )
 
+// The beans package was forked from github.com/jucardi/go-beans
+
 type dependencyCollection struct {
 	primary   string
-	instances map[string]interface{}
+	instances map[string]*instanceInfo
 	ctors     map[string]*constructorInfo
 }
 
@@ -17,10 +19,14 @@ type constructorInfo struct {
 	singleton bool
 }
 
+type instanceInfo struct {
+	resolvedFirstTime bool
+	instance          interface{}
+}
+
 var (
 	allowOverrides = false
-	dependencies   = map[reflect.Type]*dependencyCollection{}
-	onErr          ErrorCallback
+	dependencies = map[reflect.Type]*dependencyCollection{}
 )
 
 // Clear clears all registered dependencies. It requires Allow Overrides to be set to TRUE. Use this with caution, it was meant for testing purposes only.
@@ -30,11 +36,6 @@ func Clear() error {
 	}
 	dependencies = map[reflect.Type]*dependencyCollection{}
 	return nil
-}
-
-// OnError sets a function callback that will be invoked when an error occurs in the beans package
-func OnError(callback ErrorCallback) {
-	onErr = callback
 }
 
 // SetAllowOverrides is normally used when testing. It allows a registered bean to be overwritten by another implementation, like a Mock
@@ -78,10 +79,25 @@ func Primary(ref interface{}) interface{} {
 	return GetPrimary(getType(ref))
 }
 
+// InitComponents initializes all registered constructors for singleton components. This should be called after
+// any required configuration has been loaded.
+func InitComponents() {
+	log().Info("initializing singleton components")
+	for t, dep := range dependencies {
+		for name, ctor := range dep.ctors {
+			if _, ok := dep.instances[name]; ok || !ctor.singleton {
+				continue
+			}
+			log().Debug(fmt.Sprintf("component for type=%s, name=%s", t.String(), name))
+			dep.instances[name] = newInstanceInfo(ctor.ctor())
+		}
+	}
+}
+
 // Get gets the the instance by the specified name.
 func Get(t reflect.Type, name string) interface{} {
 	if !containsType(dependencies, t) {
-		onError(fmt.Errorf("no dependencies found for type %s, unable to resolve", t.Name()))
+		log().Error(fmt.Errorf("no dependencies found for type %s, unable to resolve", t.Name()))
 		return nil
 	}
 
@@ -90,16 +106,16 @@ func Get(t reflect.Type, name string) interface{} {
 	}
 
 	if instance, ok := dependencies[t].instances[name]; ok {
-		return instance
+		return triggerOnResolve(instance)
 	} else if ctorInfo, ok := dependencies[t].ctors[name]; ok {
-		instance = ctorInfo.ctor()
+		instance = newInstanceInfo(ctorInfo.ctor())
 		if ctorInfo.singleton {
 			dependencies[t].instances[name] = instance
 		}
-		return instance
+		return triggerOnResolve(instance)
 	}
 
-	onError(fmt.Errorf("dependency %s not registered, unable to resolve", name))
+	log().Error(fmt.Errorf("dependency %s not registered, unable to resolve", name))
 	return nil
 }
 
@@ -115,7 +131,7 @@ func GetPrimary(t reflect.Type) interface{} {
 		}
 	}
 
-	onError(fmt.Errorf("no primary dependency found for type '%s'", t.Name()))
+	log().Error(fmt.Errorf("no primary dependency found for type '%s'", t.Name()))
 	return nil
 }
 
@@ -140,7 +156,7 @@ func RegisterFuncByType(t reflect.Type, name string, fn func() interface{}, sing
 
 	if !containsType(dependencies, t) {
 		dependencies[t] = &dependencyCollection{
-			instances: map[string]interface{}{},
+			instances: map[string]*instanceInfo{},
 			ctors:     map[string]*constructorInfo{},
 		}
 	}
@@ -318,8 +334,7 @@ func getType(obj interface{}) reflect.Type {
 	return reflect.TypeOf(obj).Elem()
 }
 
-func onError(err error) {
-	if onErr != nil {
-		onErr(err)
-	}
+func newInstanceInfo(instance interface{}) *instanceInfo {
+	return &instanceInfo{instance: instance}
 }
+

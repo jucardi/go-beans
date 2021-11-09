@@ -1,0 +1,25 @@
+# github.com/davecgh/go-spew v1.1.1
+github.com/davecgh/go-spew/spew
+# github.com/jucardi/go-iso8601 v1.0.3
+github.com/jucardi/go-iso8601
+# github.com/jucardi/go-logger-lib v1.0.5
+github.com/jucardi/go-logger-lib/log
+# github.com/jucardi/go-streams v1.0.3
+github.com/jucardi/go-streams/streams
+# github.com/jucardi/go-strings v1.0.4
+github.com/jucardi/go-strings/stringx
+# github.com/jucardi/go-terminal-colors v1.0.2
+github.com/jucardi/go-terminal-colors
+# github.com/jucardi/go-testx v1.0.9
+github.com/jucardi/go-testx/assert
+github.com/jucardi/go-testx/testutilx
+github.com/jucardi/go-testx/testx
+# github.com/pmezard/go-difflib v1.0.0
+github.com/pmezard/go-difflib/difflib
+# github.com/sirupsen/logrus v1.8.1
+github.com/sirupsen/logrus
+# golang.org/x/sys v0.0.0-20191026070338-33540a1f6037
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# gopkg.in/yaml.v2 v2.4.0
+gopkg.in/yaml.v2

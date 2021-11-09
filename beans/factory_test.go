@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/jucardi/go-beans/beans"
-	"github.com/stretchr/testify/assert"
+	. "github.com/jucardi/go-testx/testx"
 )
 
 // The following are implementations of the IService defined in the "example_test.go"
@@ -14,6 +14,8 @@ import (
 
 // TestServiceImpl is an implementation of IService that can be used as a bean.
 type TestServiceImpl struct {
+	resolveCount          int
+	firstTimeResolveCount int
 }
 
 func (t *TestServiceImpl) SomeMethod() bool {
@@ -22,6 +24,14 @@ func (t *TestServiceImpl) SomeMethod() bool {
 
 func (t *TestServiceImpl) GetName() string {
 	return "bean1"
+}
+
+func (t *TestServiceImpl) OnResolve() {
+	t.resolveCount++
+}
+
+func (t *TestServiceImpl) OnFirstTimeResolve() {
+	t.firstTimeResolveCount++
 }
 
 // TestServiceImpl2 is an implementation of IService that can be used as a bean.
@@ -66,18 +76,19 @@ func (o *OtherImpl1) Name() string {
 
 type INotUsed interface{}
 
-// endregion
-
 // region Test Factory methods impl
 
 var ComponentType *IService
 
-func before(t *testing.T) {
+
+func before() *TestServiceImpl {
+	ret := &TestServiceImpl{}
 	beans.SetAllowOverrides(true)
-	assert.NoError(t, beans.Clear())
+	ShouldNotError(beans.Clear())
 	beans.SetAllowOverrides(false)
-	assert.NoError(t, beans.Register(ComponentType, "default", &TestServiceImpl{}))
-	assert.NoError(t, beans.SetPrimary(ComponentType, "default"))
+	ShouldNotError(beans.Register(ComponentType, "default", ret))
+	ShouldNotError(beans.SetPrimary(ComponentType, "default"))
+	return ret
 }
 
 // Wraps `bean.Resolve` but automatically casts from `interface {}` to `IService`
@@ -93,156 +104,196 @@ func Primary() IService {
 // endregion
 
 func TestGet(t *testing.T) {
-	before(t)
-	assert.True(t, Resolve("default").SomeMethod())
-	assert.Equal(t, "bean1", Resolve("default").GetName())
+	Convey("Testing Get", t, func() {
+		Convey("Sucessful Get", t, func() {
+			before()
+			ShouldBeTrue(Resolve("default").SomeMethod())
+			ShouldEqual("bean1", Resolve("default").GetName())
+		})
+		Convey("Bean not found", t, func() {
+			before()
+			ShouldBeNil(beans.Resolve(ComponentType, "something"))
+		})
+	})
 }
 
 func TestGetPrimary(t *testing.T) {
-	before(t)
-	assert.True(t,
-		Primary().SomeMethod(),
-	)
+	Convey("Testing GetPrimary", t, func() {
+		Convey("Success explicit", t, func() {
+			before()
+			ShouldBeTrue(Primary().SomeMethod())
+		})
+		Convey("Success implicit", t, func() {
+			before()
+			ShouldNotError(beans.Register((*IOther)(nil), "something", &OtherImpl1{name: "primary"}))
+			val := beans.Primary((*IOther)(nil)).(IOther)
+			ShouldNotBeNil(val)
+			ShouldEqual("primary", val.Name())
+		})
+		Convey("Failure, not found", t, func() {
+			before()
+			ShouldNotError(beans.Register((*IOther)(nil), "name1", &OtherImpl1{name: "name1"}))
+			ShouldNotError(beans.Register((*IOther)(nil), "name2", &OtherImpl1{name: "name2"}))
+			val := beans.Primary((*IOther)(nil))
+			ShouldBeNil(val)
+		})
+	})
+}
+
+func TestOnResolveHandlers(t *testing.T) {
+	Convey("Testing OnResolve handlers", t, func() {
+		instance := before()
+		Convey("Validating resolve handlers are invoked successfully the expected amount of times", t, func() {
+			ShouldEqual(0, instance.resolveCount)
+			ShouldEqual(0, instance.firstTimeResolveCount)
+
+			Resolve("default")
+			ShouldEqual(1, instance.resolveCount)
+			ShouldEqual(1, instance.firstTimeResolveCount)
+
+			Resolve("default")
+			ShouldEqual(2, instance.resolveCount)
+			ShouldEqual(1, instance.firstTimeResolveCount)
+
+			Resolve("default")
+			ShouldEqual(3, instance.resolveCount)
+			ShouldEqual(1, instance.firstTimeResolveCount)
+		})
+	})
 }
 
 func TestRegister(t *testing.T) {
-	before(t)
-	assert.NoError(t, beans.Register(ComponentType, "some-name", &TestServiceImpl2{}))
-	assert.Equal(t, "bean1", Primary().GetName())
-	assert.Equal(t, "bean2", Resolve("some-name").GetName())
+	Convey("Testing Register", t, func() {
+		Convey("Success", t, func() {
+			before()
+			ShouldNotError(beans.Register(ComponentType, "some-name", &TestServiceImpl2{}))
+			ShouldEqual("bean1", Primary().GetName())
+			ShouldEqual("bean2", Resolve("some-name").GetName())
+		})
+		Convey("Failure, already exists", t, func() {
+			before()
+			name := "some-name"
+			ShouldNotError(beans.Register(ComponentType, name, &TestServiceImpl2{}))
+			err := beans.Register(ComponentType, name, &TestServiceImpl2{})
+			ShouldError(err)
+			ShouldEqual(fmt.Sprintf("a dependency with name %s is already registered", name), err.Error())
+		})
+		Convey("Failure, invalid name", t, func() {
+			before()
+			err := beans.Register(ComponentType, "", &TestServiceImpl{})
+			ShouldError(err)
+			ShouldEqual("the name cannot be empty", err.Error())
+		})
+		Convey("Failure, type mismatch", t, func() {
+			before()
+			err := beans.Register(ComponentType, "some-name", "Something")
+			ShouldError(err)
+			ShouldEqual("the component type 'string' does not implement the provided type 'IService'", err.Error())
+		})
+	})
 }
 
 func TestSetPrimary(t *testing.T) {
-	before(t)
-	assert.NoError(t, beans.Register(ComponentType, "some-name", &TestServiceImpl2{}))
-	assert.NoError(t, beans.SetPrimary(ComponentType, "some-name"))
-	assert.NotEqual(t, "bean2", Primary().GetName())
-	assert.NoError(t, beans.SetPrimary(ComponentType, "some-name", true))
-	assert.Equal(t, "bean2", Primary().GetName())
-}
-
-func TestSetPrimary_NotFound(t *testing.T) {
-	before(t)
-	name := "something"
-	err := beans.SetPrimary(ComponentType, name)
-	assert.NotNil(t, err)
-	assert.Equal(t, fmt.Sprintf("dependency %s not registered, unable to set as primary", name), err.Error())
-}
-
-func TestRegister_Exists(t *testing.T) {
-	before(t)
-	name := "some-name"
-	assert.NoError(t, beans.Register(ComponentType, name, &TestServiceImpl2{}))
-	err := beans.Register(ComponentType, name, &TestServiceImpl2{})
-	assert.NotNil(t, err)
-	assert.Equal(t, fmt.Sprintf("a dependency with name %s is already registered", name), err.Error())
-}
-
-func TestRegister_InvalidName(t *testing.T) {
-	before(t)
-	err := beans.Register(ComponentType, "", &TestServiceImpl{})
-	assert.NotNil(t, err)
-	assert.Equal(t, "the name cannot be empty", err.Error())
-}
-
-func TestGet_NotFound(t *testing.T) {
-	before(t)
-	s := beans.Resolve(ComponentType, "something")
-	assert.Nil(t, s)
-}
-
-func TestRegister_Invalid(t *testing.T) {
-	before(t)
-	err := beans.Register(ComponentType, "some-name", "Something")
-	assert.NotNil(t, err)
-	assert.Equal(t, "the component type 'string' does not implement the provided type 'IService'", err.Error())
+	Convey("Testing SetPrimary", t, func() {
+		Convey("Success", t, func() {
+			before()
+			ShouldNotError(beans.Register(ComponentType, "some-name", &TestServiceImpl2{}))
+			ShouldNotError(beans.SetPrimary(ComponentType, "some-name"))
+			ShouldNotBeEqual("bean2", Primary().GetName())
+			ShouldNotError(beans.SetPrimary(ComponentType, "some-name", true))
+			ShouldEqual("bean2", Primary().GetName())
+		})
+		Convey("Failure, bean not found", t, func() {
+			before()
+			name := "something"
+			err := beans.SetPrimary(ComponentType, name)
+			ShouldError(err)
+			ShouldEqual(fmt.Sprintf("dependency %s not registered, unable to set as primary", name), err.Error())
+		})
+		Convey("Failure, type not found", t, func() {
+			before()
+			err := beans.SetPrimary((*string)(nil), "some-random-name")
+			ShouldError(err)
+			ShouldEqual("no dependencies found for type string, unable to resolve", err.Error())
+		})
+	})
 }
 
 func TestResolve(t *testing.T) {
-	before(t)
-	something := beans.Resolve(ComponentType, "default").(IService)
-	assert.True(t, something.SomeMethod())
-	assert.Equal(t, "bean1", something.GetName())
+	Convey("Testing Resolve", t, func() {
+		Convey("Successful", t, func() {
+			before()
+			something := beans.Resolve(ComponentType, "default").(IService)
+			ShouldBeTrue(something.SomeMethod())
+			ShouldEqual("bean1", something.GetName())
+		})
+		Convey("Failure, type not found", t, func() {
+			before()
+			val := beans.Resolve((*string)(nil), "some-random-name")
+			ShouldBeNil(val)
+		})
+	})
 }
 
 func TestRegisterFunc(t *testing.T) {
-	before(t)
-	i := 0
-	assert.NoError(t,
-		beans.RegisterFunc(ComponentType, "test-maker", func() interface{} {
-			i++
-			return &TestServiceImpl3{
-				name: "TEST_" + strconv.Itoa(i),
-			}
-		}),
-	)
+	Convey("Testing RegisterFunc", t, func() {
+		Convey("Success", t, func() {
+			before()
+			i := 0
+			ShouldNotError(
+				beans.RegisterFunc(ComponentType, "test-maker", func() interface{} {
+					i++
+					return &TestServiceImpl3{
+						name: "TEST_" + strconv.Itoa(i),
+					}
+				}),
+			)
 
-	comp1 := beans.Resolve(ComponentType, "test-maker").(IService)
-	comp2 := beans.Resolve(ComponentType, "test-maker").(IService)
+			comp1 := beans.Resolve(ComponentType, "test-maker").(IService)
+			comp2 := beans.Resolve(ComponentType, "test-maker").(IService)
 
-	assert.Equal(t, "TEST_1", comp1.GetName())
-	assert.Equal(t, "TEST_2", comp2.GetName())
-}
-
-func TestSetPrimary_TypeNotFound(t *testing.T) {
-	before(t)
-	err := beans.SetPrimary((*string)(nil), "some-random-name")
-	assert.NotNil(t, err)
-	assert.Equal(t, "no dependencies found for type string, unable to resolve", err.Error())
-}
-
-func TestResolve_TypeNotFound(t *testing.T) {
-	before(t)
-	val := beans.Resolve((*string)(nil), "some-random-name")
-	assert.Nil(t, val)
-}
-
-func TestImplicitPrimary(t *testing.T) {
-	before(t)
-	assert.NoError(t, beans.Register((*IOther)(nil), "something", &OtherImpl1{name: "primary"}))
-	val := beans.Primary((*IOther)(nil)).(IOther)
-	assert.NotNil(t, val)
-	assert.Equal(t, "primary", val.Name())
-}
-
-func TestPrimary_NotFound(t *testing.T) {
-	before(t)
-	assert.NoError(t, beans.Register((*IOther)(nil), "name1", &OtherImpl1{name: "name1"}))
-	assert.NoError(t, beans.Register((*IOther)(nil), "name2", &OtherImpl1{name: "name2"}))
-	val := beans.Primary((*IOther)(nil))
-	assert.Nil(t, val)
+			ShouldEqual("TEST_1", comp1.GetName())
+			ShouldEqual("TEST_2", comp2.GetName())
+		})
+	})
 }
 
 func TestSetAllowOverrides(t *testing.T) {
-	before(t)
-	err := beans.Register((*IOther)(nil), "name", &OtherImpl1{name: "name1"})
-	assert.Nil(t, err)
-	err = beans.Register((*IOther)(nil), "name", &OtherImpl1{name: "name2"})
-	assert.NotNil(t, err)
-	comp1 := beans.Resolve((*IOther)(nil), "name").(IOther)
-	assert.Equal(t, "name1", comp1.Name())
-	beans.SetAllowOverrides(true)
-	err = beans.Register((*IOther)(nil), "name", &OtherImpl1{name: "name2"})
-	assert.Nil(t, err)
-	comp2 := beans.Resolve((*IOther)(nil), "name").(IOther)
-	assert.Equal(t, "name2", comp2.Name())
+	Convey("Testing SetAllowOverrides", t, func() {
+		before()
+		Convey("While allow override is false", t, func() {
+			ShouldNotError(beans.Register((*IOther)(nil), "name", &OtherImpl1{name: "name1"}))
+			ShouldError(beans.Register((*IOther)(nil), "name", &OtherImpl1{name: "name2"}))
+			comp1 := beans.Resolve((*IOther)(nil), "name").(IOther)
+			ShouldEqual("name1", comp1.Name())
+		})
+		Convey("While allow override is true", t, func() {
+			beans.SetAllowOverrides(true)
+			ShouldNotError(beans.Register((*IOther)(nil), "name", &OtherImpl1{name: "name2"}))
+			comp2 := beans.Resolve((*IOther)(nil), "name").(IOther)
+			ShouldEqual("name2", comp2.Name())
+		})
+	})
 }
 
 func TestExists(t *testing.T) {
-	before(t)
-	name := "something"
-	assert.NoError(t, beans.Register((*IOther)(nil), name, &OtherImpl1{name: "primary"}))
-	contains := beans.Exists((*IOther)(nil), name)
-	assert.True(t, contains)
-	assert.False(t, beans.Exists((*IService)(nil), name))
-	assert.False(t, beans.Exists((*INotUsed)(nil), name))
+	Convey("Testing Exists", t, func() {
+		before()
+		name := "something"
+		ShouldNotError(beans.Register((*IOther)(nil), name, &OtherImpl1{name: "primary"}))
+		ShouldBeTrue(beans.Exists((*IOther)(nil), name))
+		ShouldBeFalse(beans.Exists((*IService)(nil), name))
+		ShouldBeFalse(beans.Exists((*INotUsed)(nil), name))
+	})
 }
 
 func TestGetPrimaryName(t *testing.T) {
-	before(t)
-	name := "something"
-	assert.NoError(t, beans.Register((*IOther)(nil), name, &OtherImpl1{name: "primary"}))
-	assert.NoError(t, beans.SetPrimary((*IOther)(nil), name))
-	assert.Equal(t, name, beans.GetPrimaryName((*IOther)(nil)))
-	assert.Equal(t, "", beans.GetPrimaryName((*INotUsed)(nil)))
+	Convey("Testing GetPrimaryName", t, func() {
+		before()
+		name := "something"
+		ShouldNotError(beans.Register((*IOther)(nil), name, &OtherImpl1{name: "primary"}))
+		ShouldNotError(beans.SetPrimary((*IOther)(nil), name))
+		ShouldEqual(name, beans.GetPrimaryName((*IOther)(nil)))
+		ShouldEqual("", beans.GetPrimaryName((*INotUsed)(nil)))
+	})
 }

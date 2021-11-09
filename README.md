@@ -113,14 +113,12 @@ func init() {
     //        bean.RegisterFunc(reference, BeanName, func() interface{}) {
     //
     beans.RegisterFunc((*IAlertHandler)(nil), BeanName, func() interface{} {
-        if instance != nil {
-            return instance
-    }
-
-        instance = &EmailAlertHandler{}
+        instance := &EmailAlertHandler{}
         instance.init()
         return instance
-    })
+    }, true) // This boolean value indicates that once built for the first time, the instance
+             // should be stored as a singleton, so the next time the Bean is called, the singleton
+             // instance will be returned rather that constructing a new instance.
 }
 ```
 
